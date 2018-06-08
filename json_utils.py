@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+"""
+@version: v1.0
+@author: Gaivin Wang
+@license: Apache Licence
+@contact: gaivin@outlook.com
+@site: https://github.com/gaivin/
+@software: PyCharm
+@file: json_utils.py
+@time: 6/8/2018 3:43 PM
+"""
 import json
 from datetime import datetime, date
 from functools import partial

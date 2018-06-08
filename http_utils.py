@@ -1,5 +1,16 @@
-# coding:utf-8
+#!/usr/bin/env python
+# encoding: utf-8
 
+"""
+@version: v1.0
+@author: Gaivin Wang
+@license: Apache Licence
+@contact: gaivin@outlook.com
+@site: https://github.com/gaivin/
+@software: PyCharm
+@file: http_utils.py
+@time: 6/8/2018 3:43 PM
+"""
 import re
 import sys
 from string import upper, Template

@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+"""
+@version: v1.0
+@author: Gaivin Wang
+@license: Apache Licence
+@contact: gaivin@outlook.com
+@site: https://github.com/gaivin/
+@software: PyCharm
+@file: common_utils.py
+@time: 6/8/2018 3:43 PM
+"""
 import commands, re, time, copy, datetime
 from django.utils.dateformat import DateFormat
 from logger_utils import get_logger

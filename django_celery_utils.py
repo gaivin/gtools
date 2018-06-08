@@ -1,3 +1,17 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+"""
+@version: v1.0
+@author: Gaivin Wang
+@license: Apache Licence
+@contact: gaivin@outlook.com
+@site: https://github.com/gaivin/
+@software: PyCharm
+@file: django_celery_utils.py
+@time: 6/8/2018 3:43 PM
+"""
+
 from celery import states
 from djcelery.models import TaskState, TaskMeta
 from django.forms.models import model_to_dict
