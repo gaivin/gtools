@@ -20,7 +20,7 @@ import logging
 # Logger configuration
 LOGGER_LEVEL_DEFAULT = "DEBUG"
 LOGGER_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-LOG_DIR = "..\logs"
+LOG_DIR = ".\logs"
 
 
 def get_logger(logger_name, log_dir=LOG_DIR, level=LOGGER_LEVEL_DEFAULT, logger_format=LOGGER_FORMAT):

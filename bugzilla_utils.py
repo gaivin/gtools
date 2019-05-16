@@ -19,6 +19,8 @@ import urllib3
 urllib3.disable_warnings()
 
 logger = get_logger("Bugzilla")
+
+
 class Bugzilla():
     def __init__(self, host="https://bugs.avamar.com"):
         self.host = host
@@ -70,6 +72,7 @@ class Bugzilla():
         return self._export_bugs_with_parameters(parameters=parameters, csv_file=csv_file)
 
     def export_bugs_to_csv_by_list(self, list_id, fields, csv_file=None):
+        logger.info("Export bugs by list_id %s" % list_id)
         parameters = dict()
         parameters["ctype"] = "csv"
         parameters["human"] = "1"
@@ -81,6 +84,7 @@ class Bugzilla():
         return self._export_bugs_with_parameters(parameters=parameters, csv_file=csv_file)
 
     def _export_bugs_with_parameters(self, parameters, csv_file=None):
+        logger.info("Export bugs with parameters: %s" % parameters)
         self.session.params = parameters
         response = self.session.get("%s/buglist.cgi" % self.host)
         if response.status_code != 200:
@@ -114,4 +118,4 @@ if __name__ == "__main__":
               "cf_esc_source", "resolution", "cf_build_number", "changeddate", "cf_dev_contact", "qa_contact",
               "cf_resolver", "cf_resolve_date", "bug_severity", "cf_tc_id", "bug_file_loc", "cf_target_date", "product"]
 
-    bugs = bz.export_bugs_to_csv_by_list(list_id=list_id, fields=fields)
+    bugs = bz.export_bugs_to_csv_by_list(list_id=list_id, fields=fields, csv_file="bugs.csv")
