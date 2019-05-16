@@ -17,7 +17,8 @@ import datetime, os
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 import re
-
+from logger_utils import get_logger
+logger = get_logger(logger_name="ESUtils")
 
 class ESUtils():
     def __init__(self, hosts):
@@ -25,11 +26,11 @@ class ESUtils():
 
     def import_from_csv(self, csv_file, index_name, timestamp=None, filed_format=None, **addition_kwargs):
         if not os.path.exists(csv_file):
-            print("ERROR: %s file not found" % csv_file)
+            logger.error("%s file not found" % csv_file)
             raise Exception("Cannot find the csv file %s" % csv_file)
         actions = []
         if not self.es.indices.exists(index=index_name, allow_no_indices=True):
-            print("Warning: Index is not found")
+            logger.warn("Index is not found")
             self.es.indices.create(index=index_name, body={}, ignore=400)
         if timestamp is None:
             timestamp = datetime.datetime.now()
@@ -41,8 +42,7 @@ class ESUtils():
             source.update(**addition_kwargs)
             source["timestamp"] = timestamp
             actions.append({"_index": index_name, "_source": source})
-        response = helpers.bulk(self.es, actions, chunk_size=100)
-        print("DEBUG: Bulk result %s" % list(response))
+        helpers.bulk(self.es, actions, chunk_size=100)
         self.es.indices.flush(index=[index_name])
         return len(actions)
 
@@ -64,7 +64,7 @@ class ESUtils():
                     continue
                 body_dict[key] = str(body_dict[key]).encode('utf-8')
             except ValueError as e:
-                print("Warning: %s for %s" % (str(e), body_dict))
+                logger.warn("%s for %s" % (str(e), body_dict))
                 remove_keys.append(key)
         for key in remove_keys:
             body_dict.pop(key)
@@ -73,7 +73,7 @@ class ESUtils():
 
 if __name__ == "__main__":
     esu = ESUtils(hosts="http://vm-hrgods-61-46.asl.lab.emc.com:9200")
-    number = esu.import_from_csv(csv_file="bugs-2019-05-14.csv", index_name="fsa-test",
-                                 timestamp=datetime.datetime(2019, 5, 12),
+    number = esu.import_from_csv(csv_file="bugs-2019-05-13.csv", index_name="fsa-bugs",
+                                 timestamp=datetime.datetime(2019, 5, 14, 13, 0, 0),
                                  filed_format=esu.item_format)
     print(number)

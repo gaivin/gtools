@@ -12,12 +12,13 @@
 @time: 3/26/2019 9:30 AM 
 """
 import requests, json
-from csv import DictReader
+
+from logger_utils import get_logger
 import urllib3
 
 urllib3.disable_warnings()
 
-
+logger = get_logger("Bugzilla")
 class Bugzilla():
     def __init__(self, host="https://bugs.avamar.com"):
         self.host = host
@@ -29,14 +30,13 @@ class Bugzilla():
         data = self._generate_form_data(Bugzilla_login=user_name, Bugzilla_password=password,
                                         Bugzilla_restrictlogin="on",
                                         GoAheadAndLogin=goahead_and_login)
-        print("======================")
 
         response = self.session.post(login_url, files=data, verify=False)
         if response.status_code != 200:
-            print("ERROR: Login Bugzilla failed. Please check your user and password (%s/%s). " % (user_name, password))
-            print("ERROR: %s" % response.text)
+            logger.error("Login Bugzilla failed. Please check your user and password (%s/%s). " % (user_name, password))
+            logger.error("%s" % response.text)
             raise Exception(message="Login failed")
-        print("INFO: Login Bugzilla successfully!")
+        logger.info("Login Bugzilla successfully!")
         return self.session
 
     def _generate_form_data(self, **form_data_kwargs):
@@ -49,7 +49,7 @@ class Bugzilla():
         return form_data
 
     def export_bugs_to_csv_by_bug_id(self, bug_ids, fields, csv_file=None):
-        print("INFO: Export bugs %s with fields %s" % (bug_ids, fields))
+        logger.info("Export bugs %s with fields %s" % (bug_ids, fields))
         parameters = dict()
         parameters["j_top"] = "OR"
         parameters["ctype"] = "csv"
@@ -84,8 +84,8 @@ class Bugzilla():
         self.session.params = parameters
         response = self.session.get("%s/buglist.cgi" % self.host)
         if response.status_code != 200:
-            print("ERROR: Get bug list failed with parameters" % parameters)
-            print(response.text)
+            logger.error("Get bug list failed with parameters" % parameters)
+            logger.error(response.text)
             raise Exception(message="Get bugs failed")
 
         if csv_file is None:
