@@ -18,9 +18,9 @@ import os
 import logging
 
 # Logger configuration
-LOGGER_LEVEL_DEFAULT = "DEBUG"
+LOGGER_LEVEL_DEFAULT = "INFO"
 LOGGER_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-LOG_DIR = ".\logs"
+LOG_DIR = os.path.join(os.path.curdir, "logs")
 
 
 def get_logger(logger_name, log_dir=LOG_DIR, level=LOGGER_LEVEL_DEFAULT, logger_format=LOGGER_FORMAT):

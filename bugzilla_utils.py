@@ -12,7 +12,7 @@
 @time: 3/26/2019 9:30 AM 
 """
 import requests, json
-
+import fire
 from logger_utils import get_logger
 import urllib3
 
@@ -22,7 +22,7 @@ logger = get_logger("Bugzilla")
 
 
 class Bugzilla():
-    def __init__(self, host="https://bugs.avamar.com"):
+    def __init__(self, host):
         self.host = host
 
     def login(self, user_name, password):
@@ -110,12 +110,4 @@ class Bugzilla():
 
 
 if __name__ == "__main__":
-    bz = Bugzilla()
-    bz.login(user_name="wangg27", password="WEurfn_-+=")
-    list_id = "2525477"
-    bugs = [305610]
-    fields = ["priority", "assigned_to", "reporter", "bug_status", "short_desc", "opendate", "target_milestone",
-              "cf_esc_source", "resolution", "cf_build_number", "changeddate", "cf_dev_contact", "qa_contact",
-              "cf_resolver", "cf_resolve_date", "bug_severity", "cf_tc_id", "bug_file_loc", "cf_target_date", "product"]
-
-    bugs = bz.export_bugs_to_csv_by_list(list_id=list_id, fields=fields, csv_file="bugs.csv")
+    fire.Fire(Bugzilla)
