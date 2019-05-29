@@ -37,7 +37,7 @@ class ESUtils():
         elif not isinstance(timestamp, datetime.datetime):
             raise Exception("timestamp should be datetime.datetime class, but %s provided." % type(timestamp))
 
-        for item in DictReader(open(csv_file, 'rU')):
+        for item in DictReader(open(csv_file, 'rU', encoding="utf-8")):
             source = item if filed_format is None else filed_format(item)
             source.update(**addition_kwargs)
             source["timestamp"] = timestamp
@@ -56,11 +56,15 @@ class ESUtils():
                     continue
                 match_result = re.findall(r"^\d\d\d\d-\d\d-\d\d\s\d\d:\d\d:\d\d$", body_dict[key])
                 if match_result:
-                    body_dict[key] = datetime.datetime.strptime(match_result[0], "%Y-%m-%d %H:%M:%S")
+                    body_dict[key] = datetime.datetime.strptime(match_result[0], r"%Y-%m-%d %H:%M:%S")
                     continue
                 match_result = re.findall(r"^\d\d\d\d-\d\d-\d\d$", body_dict[key])
                 if match_result:
-                    body_dict[key] = datetime.datetime.strptime(match_result[0], "%Y-%m-%d")
+                    body_dict[key] = datetime.datetime.strptime(match_result[0], r"%Y-%m-%d")
+                    continue
+                match_result = re.findall(r"^\d+/\d+/\d{4}$", body_dict[key])
+                if match_result:
+                    body_dict[key] = datetime.datetime.strptime(match_result[0], r"%m/%d/%Y")
                     continue
                 body_dict[key] = str(body_dict[key]).encode('utf-8')
             except ValueError as e:
