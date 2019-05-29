@@ -78,7 +78,6 @@ class Bugzilla():
         parameters["human"] = "1"
         parameters["query_format"] = "advanced"
         parameters["list_id"] = list_id
-        parameters["product"] = "File System Agent Boost"
         columnlist = ",".join(fields)
         parameters["columnlist"] = columnlist
         return self._export_bugs_with_parameters(parameters=parameters, csv_file=csv_file)
@@ -95,7 +94,7 @@ class Bugzilla():
         if csv_file is None:
             csv_file = self._get_file_name_from_header(response)
 
-        with open(csv_file, "w") as csvfile:
+        with open(csv_file, "w", encoding="utf-8") as csvfile:
             csvfile.write(response.text)
 
         return csv_file
