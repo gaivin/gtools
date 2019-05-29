@@ -71,13 +71,13 @@ class Bugzilla():
         self.session.params = parameters
         return self._export_bugs_with_parameters(parameters=parameters, csv_file=csv_file)
 
-    def export_bugs_to_csv_by_list(self, list_id, fields, csv_file=None):
-        logger.info("Export bugs by list_id %s" % list_id)
+    def export_bugs_to_csv_by_product(self, product, fields, csv_file=None):
+        logger.info("Export bugs by product %s" % product)
         parameters = dict()
         parameters["ctype"] = "csv"
         parameters["human"] = "1"
         parameters["query_format"] = "advanced"
-        parameters["list_id"] = list_id
+        parameters["product"] = product
         columnlist = ",".join(fields)
         parameters["columnlist"] = columnlist
         return self._export_bugs_with_parameters(parameters=parameters, csv_file=csv_file)
