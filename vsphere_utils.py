@@ -32,28 +32,8 @@ class vSphere(VIServer):
         return self._create_vm_snapshot(virtual_machine=vm, snapshot_name=snapshot_name, description=description,
                                         force=force, sync_run=sync_run, dump_memory=dump_memory)
 
-    def _create_vm_snapshot(self, virtual_machine, snapshot_name, description=None, force=False, sync_run=True,
-                            dump_memory=False):
-        vm_name = virtual_machine.get_property("name")
-        print("INFO: Create Snapshot for '%s'..." % vm_name)
-        exist_snapshots_names = map(vi_snapshot.VISnapshot.get_name, virtual_machine.get_snapshots())
-        if snapshot_name in exist_snapshots_names and force is False:
-            print("WARNING: '%s' already have snapshot with name '%s'." % (vm_name, snapshot_name))
-            return False
-        current_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        if description is None:
-            description = current_time
-        else:
-            description = "%s: \n %s" % (current_time, description)
-
-        result = virtual_machine.create_snapshot(name=snapshot_name, description=description, sync_run=sync_run,
-                                                 memory=dump_memory)
-        if result is None:
-            result = True
-        return result
-
-    def create_vm_snapshot_for_resource_pool(self, snapshot_name, resource_pool_name, description=None, sync_run=False,
-                                             **kwargs):
+    def create_vms_snapshot_for_resource_pool(self, snapshot_name, resource_pool_name, description=None, sync_run=False,
+                                              **kwargs):
         if not resource_pool_name.startswith("/Resources/"):
             print("ERROR: Resource pool name should start with '/Resources/'")
             return False
@@ -74,23 +54,22 @@ class vSphere(VIServer):
         vm = self.get_vm_by_name(name=vm_name, datacenter=vm_datacenter)
         return self._revert_vm_snapshot(virtual_machine=vm, snapshot_name=snapshot_name, sync_run=sync_run)
 
-    def _revert_vm_snapshot(self, virtual_machine, snapshot_name, sync_run=True):
-        vm_name = virtual_machine.get_property("name")
-        print("INFO: Revert vm '%s' to snapshot '%s'..." % (vm_name, snapshot_name))
-        exist_snapshots_names = map(vi_snapshot.VISnapshot.get_name, virtual_machine.get_snapshots())
-        if snapshot_name not in exist_snapshots_names:
-            print("WARNING: Snapshot '%s' is not not exist in vm '%s'." % (snapshot_name, vm_name))
-            return False
-
-        result = virtual_machine.revert_to_named_snapshot(name=snapshot_name, sync_run=sync_run)
-
-        if result is None:
-            result = True
-        return result
+    def delete_vm_snapshot(self, vm_name, snapshot_name, sync_run=True, vm_datacenter=None):
+        vm = self.get_vm_by_name(name=vm_name, datacenter=vm_datacenter)
+        return self._delete_vm_snapshot(virtual_machine=vm, snapshot_name=snapshot_name, sync_run=sync_run)
 
     def rename_vm(self, vm_name, new_vm_name, sync_run=True):
         vm = self.get_vm_by_name(name=vm_name)
-        self._rename_vm(virtual_machine=vm, new_vm_name=new_vm_name, sync_run=sync_run)
+        result = self._rename_vm(virtual_machine=vm, new_vm_name=new_vm_name, sync_run=sync_run)
+        if result is None:
+            result = True
+            print("INFO: Rename vm '%s' to '%s' successfully." % (vm_name, new_vm_name))
+        else:
+            info = result.get_info()
+            info_obj = info._obj
+            print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
+            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+        return result
 
     def _rename_vm(self, virtual_machine, new_vm_name, sync_run=True):
         request = VI.Rename_TaskRequestMsg()
@@ -107,11 +86,74 @@ class vSphere(VIServer):
                 raise VIException(vi_task.get_error_message(),
                                   FaultTypes.TASK_ERROR)
             return
-
         return vi_task
+
+    def _revert_vm_snapshot(self, virtual_machine, snapshot_name, sync_run=True):
+        vm_name = virtual_machine.get_property("name")
+        print("INFO: Revert vm '%s' to snapshot '%s'..." % (vm_name, snapshot_name))
+        exist_snapshots_names = map(vi_snapshot.VISnapshot.get_name, virtual_machine.get_snapshots())
+        if snapshot_name not in exist_snapshots_names:
+            print("WARNING: Snapshot '%s' is not not exist in vm '%s'." % (snapshot_name, vm_name))
+            return False
+        result = virtual_machine.revert_to_named_snapshot(name=snapshot_name, sync_run=sync_run)
+        if result is None:
+            result = True
+            print("INFO: Revert vm '%s' to snapshot '%s' successfully." % (vm_name, snapshot_name))
+        else:
+            info = result.get_info()
+            info_obj = info._obj
+            print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
+            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+        return result
+
+    def _delete_vm_snapshot(self, virtual_machine, snapshot_name, sync_run=True):
+        vm_name = virtual_machine.get_property("name")
+        print("INFO: Remove snapshot '%s' for vm '%s'..." % (snapshot_name, vm_name))
+        exist_snapshots_names = map(vi_snapshot.VISnapshot.get_name, virtual_machine.get_snapshots())
+        if snapshot_name not in exist_snapshots_names:
+            print("WARNING: Snapshot '%s' is not not exist in vm '%s'." % (snapshot_name, vm_name))
+            return False
+        result = virtual_machine.delete_named_snapshot(name=snapshot_name, sync_run=sync_run)
+        if result is None:
+            result = True
+            print("INFO: Remove snapshot '%s' for vm '%s' successfully." % (snapshot_name, vm_name))
+        else:
+            info = result.get_info()
+            info_obj = info._obj
+            print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
+            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+
+        return result
+
+    def _create_vm_snapshot(self, virtual_machine, snapshot_name, description=None, force=False, sync_run=True,
+                            dump_memory=False):
+        vm_name = virtual_machine.get_property("name")
+        print("INFO: Create Snapshot for '%s'..." % vm_name)
+        exist_snapshots_names = map(vi_snapshot.VISnapshot.get_name, virtual_machine.get_snapshots())
+        if snapshot_name in exist_snapshots_names and force is False:
+            print("WARNING: '%s' already have snapshot with name '%s'." % (vm_name, snapshot_name))
+            return False
+        current_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        if description is None:
+            description = current_time
+        else:
+            description = "%s: \n %s" % (current_time, description)
+
+        result = virtual_machine.create_snapshot(name=snapshot_name, description=description, sync_run=sync_run,
+                                                 memory=dump_memory)
+        if result is None:
+            result = True
+            print("INFO: Create Snapshot for '%s' successfully." % vm_name)
+        else:
+            info = result.get_info()
+            info_obj = info._obj
+            print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
+            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+        return result
 
 
 if __name__ == "__main__":
     vu = vSphere()
     vu.connect("10.25.61.45", "administrator", "Chang3M3Now.")
-    vu.rename_vm(vm_name="DS-Renamed", new_vm_name="DS")
+    vu.create_vm_snapshot(vm_name="DS", snapshot_name="test")
+    vu.delete_vm_snapshot(vm_name="DS", snapshot_name="test", sync_run=False)
