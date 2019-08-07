@@ -12,7 +12,7 @@
 @time: 7/16/2019 6:12 PM 
 """
 
-from pysphere import VIServer, vi_snapshot
+from pysphere import VIServer, vi_snapshot, vi_virtual_machine
 from pysphere.vi_task import VITask
 import pysphere.resources.VimService_services as VI
 from pysphere.resources.vi_exception import VIException, FaultTypes
@@ -68,7 +68,39 @@ class vSphere(VIServer):
             info = result.get_info()
             info_obj = info._obj
             print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
-            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+                info_obj.Name, info_obj.Task, info_obj.EventChainId))
+        return result
+
+    def power_on_vm(self, vm_name, sync_run=True):
+        vm = self.get_vm_by_name(name=vm_name)
+        if vm.get_status() == vi_virtual_machine.VMPowerState.POWERED_ON:
+            print("VM '%s' already powered on." % vm_name)
+            return True
+        result = vm.power_on(sync_run=sync_run)
+        if result is None:
+            result = True
+            print("INFO: Poweron vm '%s'  successfully." % vm_name)
+        else:
+            info = result.get_info()
+            info_obj = info._obj
+            print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
+                info_obj.Name, info_obj.Task, info_obj.EventChainId))
+        return result
+
+    def power_off_vm(self, vm_name, sync_run=True):
+        vm = self.get_vm_by_name(name=vm_name)
+        if vm.get_status() == vi_virtual_machine.VMPowerState.POWERED_OFF:
+            print("VM '%s' already powered off." % vm_name)
+            return True
+        result = vm.power_off(sync_run=sync_run)
+        if result is None:
+            result = True
+            print("INFO: Power off vm '%s'  successfully." % vm_name)
+        else:
+            info = result.get_info()
+            info_obj = info._obj
+            print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
+                info_obj.Name, info_obj.Task, info_obj.EventChainId))
         return result
 
     def _rename_vm(self, virtual_machine, new_vm_name, sync_run=True):
@@ -103,7 +135,7 @@ class vSphere(VIServer):
             info = result.get_info()
             info_obj = info._obj
             print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
-            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+                info_obj.Name, info_obj.Task, info_obj.EventChainId))
         return result
 
     def _delete_vm_snapshot(self, virtual_machine, snapshot_name, sync_run=True):
@@ -121,7 +153,7 @@ class vSphere(VIServer):
             info = result.get_info()
             info_obj = info._obj
             print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
-            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+                info_obj.Name, info_obj.Task, info_obj.EventChainId))
 
         return result
 
@@ -148,12 +180,14 @@ class vSphere(VIServer):
             info = result.get_info()
             info_obj = info._obj
             print("INFO: %s '%s' with eventChainId '%s' is submitted." % (
-            info_obj.Name, info_obj.Task, info_obj.EventChainId))
+                info_obj.Name, info_obj.Task, info_obj.EventChainId))
         return result
 
 
 if __name__ == "__main__":
     vu = vSphere()
     vu.connect("10.25.61.45", "administrator", "Chang3M3Now.")
-    vu.create_vm_snapshot(vm_name="DS", snapshot_name="test")
-    vu.delete_vm_snapshot(vm_name="DS", snapshot_name="test", sync_run=False)
+    description = """hello"""
+    vu.power_off_vm(vm_name="Ubuntu16.04LTS")
+    # vu.create_vm_snapshot(vm_name="DS", snapshot_name="test")
+    # vu.delete_vm_snapshot(vm_name="DS", snapshot_name="test", sync_run=False)
