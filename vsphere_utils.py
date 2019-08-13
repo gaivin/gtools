@@ -187,7 +187,10 @@ class vSphere(VIServer):
 if __name__ == "__main__":
     vu = vSphere()
     vu.connect("10.25.61.45", "administrator", "Chang3M3Now.")
-    description = """hello"""
-    vu.power_off_vm(vm_name="Ubuntu16.04LTS")
-    # vu.create_vm_snapshot(vm_name="DS", snapshot_name="test")
+    vms = ["Ubuntu16.04LTS", "Ubuntu18.04.2LTS"]
+    snapshot_name = "base"
+    description = """Base Snapshot"""
+    for vm in vms:
+        vu.create_vm_snapshot(vm_name=vm, snapshot_name=snapshot_name)
     # vu.delete_vm_snapshot(vm_name="DS", snapshot_name="test", sync_run=False)
+    # vu.power_off_vm(vm_name="Ubuntu16.04LTS")
