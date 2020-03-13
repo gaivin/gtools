@@ -160,7 +160,7 @@ def generate_random_content_file(file_path, block_count=1000, block_size_k=1, se
     cmd = "dd bs=%dk count=%d if=/dev/urandom of=%s seek=%s> /dev/null 2>&1" % (
         block_size_k, block_count, file_path, seek)
 
-    execute("ls -lh %s" % file_path)
+    # execute("ls -lh %s" % file_path)
     status, output = execute(cmd)
     if status:
         logger.error("File %s is not generated" % file_path)
@@ -226,9 +226,8 @@ def fill_volume(volume, percentage=10, max_single_file_size=1000 * 100, min_sing
 
     while volume_detail["used_percent"] < percentage:
         diff_size = target_size - volume_detail["used"]
-        logger.debug(
-            "Target is %s percent, Target size is %s, used size is %s " % (
-                percentage, target_size, volume_detail["used"]))
+        logger.debug("Target is %s percent, Target size is %s, used size is %s " % (
+            percentage, target_size, volume_detail["used"]))
         logger.debug("We need fill %sKB to achieve the target" % diff_size)
         max_file_size = min(diff_size, max_single_file_size)  # file count control.
         if min_single_file_size >= max_file_size - accuracy_kb:
@@ -242,6 +241,38 @@ def fill_volume(volume, percentage=10, max_single_file_size=1000 * 100, min_sing
         generate_random_content_file(file_path=filename, block_count=block_count, block_size_k=block_size)
         volume_detail = get_volume_status(volume)
     logger.info("Fill volume completed.")
+
+
+def fill_path(path, target_size=1000 * 1000, max_single_file_size=1000 * 100, min_single_file_size=10,
+              accuracy_kb=1000):
+    path_size = get_path_size(path)
+    while path_size < target_size:
+        diff_size = target_size - path_size
+        logger.debug("Target size is %s, current size is %s " % (target_size, path_size))
+        logger.debug("We need fill %sKB to achieve the target" % diff_size)
+        max_file_size = min(diff_size, max_single_file_size)  # file count control.
+        if min_single_file_size >= max_file_size - accuracy_kb:
+            logger.info("The file size accuracy is OK. Current volume status is %s" % volume_detail)
+            break
+        file_size = randint(min_single_file_size, max_file_size)
+        block_size = accuracy_kb / 10
+        block_count = file_size / block_size
+        filename = "bc%s-bs%s-%s" % (block_count, block_size, datetime.datetime.now().isoformat())
+        filename = os.path.join(path, filename)
+        generate_random_content_file(file_path=filename, block_count=block_count, block_size_k=block_size)
+        path_size = get_path_size(path)
+    logger.info("Fill path completed.")
+
+
+def get_path_size(path):
+    cmd = "du %s --max-depth=0" % path
+    status, output = execute(cmd, ignore_error=True)
+    if status == 0:
+        print("DEBUG: Output: %s" % output)
+        return int(output.split()[0])
+    else:
+        print("ERROR: execute command %s failed." % cmd)
+        exit(1)
 
 
 def set_read_buffer():
