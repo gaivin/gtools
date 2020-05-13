@@ -17,12 +17,20 @@ import datetime, os
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 import re
+import fire
 from logger_utils import get_logger
+
 logger = get_logger(logger_name="ESUtils")
 
-class ESUtils():
+
+class ESUtils:
     def __init__(self, hosts):
         self.es = Elasticsearch(hosts=hosts)
+
+    def import_from_dict(self, doc_dict, index_name, **addition_kwargs):
+        doc_dict.update(**addition_kwargs)
+        response = self.es.index(index=index_name, body=doc_dict)
+        return response
 
     def import_from_csv(self, csv_file, index_name, timestamp=None, filed_format=None, **addition_kwargs):
         if not os.path.exists(csv_file):
@@ -37,7 +45,7 @@ class ESUtils():
         elif not isinstance(timestamp, datetime.datetime):
             raise Exception("timestamp should be datetime.datetime class, but %s provided." % type(timestamp))
 
-        for item in DictReader(open(csv_file, 'rU', encoding="utf-8")):
+        for item in DictReader(open(csv_file, "r")):
             source = item if filed_format is None else filed_format(item)
             source.update(**addition_kwargs)
             source["timestamp"] = timestamp
@@ -66,6 +74,10 @@ class ESUtils():
                 if match_result:
                     body_dict[key] = datetime.datetime.strptime(match_result[0], r"%m/%d/%Y")
                     continue
+                match_result = re.findall(r"^\d+$", body_dict[key])
+                if match_result:
+                    body_dict[key] = int(match_result[0])
+                    continue
                 body_dict[key] = str(body_dict[key]).encode('utf-8')
             except ValueError as e:
                 logger.warn("%s for %s" % (str(e), body_dict))
@@ -75,9 +87,20 @@ class ESUtils():
         return body_dict
 
 
-if __name__ == "__main__":
-    esu = ESUtils(hosts="http://vm-hrgods-61-46.asl.lab.emc.com:9200")
-    number = esu.import_from_csv(csv_file="bugs-2019-05-13.csv", index_name="fsa-bugs",
-                                 timestamp=datetime.datetime(2019, 5, 14, 13, 0, 0),
+def dict2es(host, index_name, doc_dict, **addition_kwargs):
+    esu = ESUtils(hosts=host)
+    addition_kwargs.update(timestamp=datetime.datetime.utcnow())
+    response = esu.import_from_dict(doc_dict=doc_dict, index_name=index_name, **addition_kwargs)
+    print(response)
+
+
+def csv2es(host, index_name, csv_file):
+    esu = ESUtils(hosts=host)
+    number = esu.import_from_csv(csv_file=csv_file, index_name=index_name,
+                                 timestamp=datetime.datetime.utcnow(),
                                  filed_format=esu.item_format)
-    print(number)
+    print("Imported %s items." % number)
+
+
+if __name__ == "__main__":
+    fire.Fire(csv2es)
