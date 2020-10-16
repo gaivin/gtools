@@ -21,10 +21,9 @@ def execute(cmd, ignore_error=True, verbose=False):
         return output
 
 
-def get_nas_acl(path, mount_type="cifs", user=None):
-    # Get Config
-
-    # Get Acl
+def get_nas_acl(path, mount_type=None, user=None):
+    if not mount_type:
+        mount_type = get_mount_type(path)
     get_acl_tool = "getcifsacl" if mount_type == "cifs" else "nfs4_getfacl"
     user_pattern = "%s:" % user if mount_type == "cifs" else "%s@" % user
     get_acl_cmd = "%s %s" % (get_acl_tool, path) if user is None else "%s %s | grep %s" % (
@@ -35,7 +34,6 @@ def get_nas_acl(path, mount_type="cifs", user=None):
 
 def get_cifs_owner(path):
     owner_string = get_nas_acl(path=path, mount_type="cifs", user="OWNER")
-
     owner_pattern = "OWNER:(.*)"
     matched_names = re.findall(pattern=owner_pattern, string=owner_string)
     if matched_names:
@@ -96,12 +94,9 @@ def set_nas_files_acl(files, user=None, mount_type="cifs"):
 
 
 def set_nas_folder_acl(folder, user=None):
-    mount_info = get_mount_type(folder)
-    if mount_info:
-        mount_type = mount_info["mount_type"]
-        set_nas_acl = set_file_cifs_acl if mount_type == "cifs" else set_file_nfs_acl
-    else:
-        exit(1)
+    mount_type = get_mount_type(folder)
+    set_nas_acl = set_file_cifs_acl if mount_type == "cifs" else set_file_nfs_acl
+
     for root, dirs, files in os.walk(folder):
         for _file in files:
             set_nas_acl(path=os.path.join(root, _file), user=user)
@@ -114,19 +109,19 @@ def get_mount_point(path):
             print("ERROR: It is not a mount path.")
             return None
         elif os.path.ismount(path):
-            print("DEBUG: Found mount dir: %s" % path)
+            # print("DEBUG: Found mount dir: %s" % path)
             if path.endswith(os.path.sep):
                 path = path[0:-1]
             return path
         path = os.path.dirname(path)
 
 
-def get_mount_type(path):
+def get_mount_info(path):
     mount_point = get_mount_point(path)
     if mount_point:
-        mount_cmd = "mount | grep %s" % mount_point
+        mount_cmd = "mount | grep '%s type'" % mount_point
         mount_info = execute(mount_cmd, ignore_error=False)
-        mount_pattern = "(.*) on (%s) type (.*) \(.*vers=(\d+\.?\d*)," % mount_point
+        mount_pattern = r"(.*) on (%s) type (.*) \(.*vers=(.*?)," % mount_point
         matches = re.findall(pattern=mount_pattern, string=mount_info)
         if matches:
             return {"mount_source": matches[0][0], "mount_point": matches[0][1], "mount_type": matches[0][2],
@@ -139,6 +134,15 @@ def get_mount_type(path):
         return None
 
 
+def get_mount_type(path):
+    mount_info = get_mount_info(path)
+    if mount_info:
+        return mount_info["mount_type"]
+    else:
+        print("ERROR: Cannot get the mount info for %s" % path)
+        return None
+
+
 def get_cifs_attr(path, attribute="creationtime"):
     attributes = ("dosattrib", "creationtime")
     if attribute not in attributes:
@@ -147,17 +151,23 @@ def get_cifs_attr(path, attribute="creationtime"):
     if not os.path.exists(path):
         print("ERROR: %s is not exist" % path)
         return None
-    mount_info = get_mount_type(path)
-    if not mount_info:
-        print("ERROR: %s is not a mount path" % path)
-        return None
-    mount_type = mount_info["mount_type"]
+    mount_type = get_mount_type(path)
     if mount_type != "cifs":
         print("ERROR: %s is a %s mount. Not a cifs mount" % (path, mount_type))
         return None
     get_attr_cmd = "getfattr  -n user.cifs.%s %s" % (attribute, path)
     output = execute(get_attr_cmd, ignore_error=False)
     return output
+
+
+def mount_cifs_share(host, share_path, mount_point, version=None, user=None, password=None):
+    option = "vers=%s" % version if version else ""
+    option = "%s,user=%s" % (option, user) if user else option
+    option = "%s,password=%s" % (password, user) if password else option
+    option = "-o %s" % option if option else option
+    mount_cmd = "mount -t cifs //%s:%s  %s %s" % (
+        host, share_path, mount_point, option)
+    execute(mount_cmd, ignore_error=False, verbose=True)
 
 
 if __name__ == "__main__":
