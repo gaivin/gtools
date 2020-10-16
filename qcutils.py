@@ -19,22 +19,54 @@ import fire
 from collections import OrderedDict
 
 
-class ALM_REST_LIB():
+class ALMException(Exception):
+    def __init__(self, message):
+        self.message = message
+        self.type = "ALMException"
+
+
+class QCPosterException(Exception):
+    def __init__(self, message):
+        self.message = message
+        self.type = "QCPosterException"
+
+
+class ALM_REST_LIB:
     host = None
     session = None
 
-    def __init__(self, host, domain, project, return_type="application/json", accept="application/json"):
+    def __init__(self, host, domain, project, user=None, password=None, return_type="application/json",
+                 accept="application/json"):
         self.host = host
         self.domain = domain
         self.project = project
         self.base_url = "%s/qcbin/rest/domains/%s/projects/%s" % (self.host, self.domain, self.project)
         self.return_type = return_type
         self.accept = accept
-
         self.get = functools.partial(self._request, method="get")
         self.post = functools.partial(self._request, method="post")
         self.put = functools.partial(self._request, method="put")
         self.delete = functools.partial(self._request, method="delete")
+        self.logged_in = False
+        if user:
+            self.login(user, password)
+
+    def __enter__(self):
+        print("Enter with statement")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val:
+            print("ERROR: %s" % exc_val)
+        else:
+            print("INFO: ALM called Successfully")
+        self.close()
+        print("INFO: Close ALM session.")
+        self.logged_in = False
+        return False
+
+    def close(self):
+        return self.session.close()
 
     def _request(self, method, url, data=None, params=None, headers=None, **request_kwargs):
         """
@@ -50,7 +82,7 @@ class ALM_REST_LIB():
         request_method = method.lower()
         print("DEBUG: Method: %s" % request_method)
         if request_method not in ["get", "post", "put", "delete"]:
-            print("ERROR: Method [%s] is not available for ALM class" % method)
+            print("ERROR: Method [%s] is not available for ALM classes" % method)
             return None
         if hasattr(self.session, request_method):
             request = getattr(self.session, request_method)
@@ -85,11 +117,10 @@ class ALM_REST_LIB():
         login_url = "%s/qcbin/api/authentication/sign-in" % self.host
         response = self.session.get(login_url)
         if response.status_code != 200:
-            print("ERROR: Login ALM failed. Status Code: %s" % response.status_code)
-            print("ERROR: Message: %s" % response.text)
-            return False
+            raise ALMException("Login ALM failed. Status Code: %s, Message: %s" % (response.status_code, response.text))
         else:
             print("Login ALM Successfully. ")
+            self.logged_in = True
             return True
 
     def get_entity_fields(self, entity_type, required=True):
@@ -174,6 +205,50 @@ class ALM_REST_LIB():
             return True
         else:
             print("ERROR: [%s] Test run update failed. [%s]" % (response.status_code, response.text))
+            return False
+
+    def update_entity(self, entity_type, entity_id, return_fields="id,name", **field_kwargs):
+        """
+        Update the fields value for the entity.
+        :param entity_type: The type of the entity, such as tests, test_runs, test_sets
+        :param entity_id: The ID of the entity
+        :param return_fields: The fields you want to return to debug after updating
+        :param field_kwargs: name, subtype-id, owner, last-modified, description, status, user_xx
+        :return: True: successful, False: Failed
+        """
+        url = "%s/%s/%s" % (self.base_url, entity_type, entity_id)
+        data = self._generate_fileds(**field_kwargs)
+        parameters = dict(fields=return_fields)
+        response = self.put(url=url, data=data, params=parameters)
+
+        if response.status_code == 200:
+            print("INFO: '%s[%s]' is updated with values %s " % (entity_type, entity_id, data))
+            return True
+        else:
+            print("ERROR: [%s] '%s[%s]' update failed. [%s]" % (
+                response.status_code, entity_type, entity_id, response.text))
+            return False
+
+    def update_test_set(self, test_set_id, status="Closed"):
+        return self.update_entity(entity_type="test-sets", entity_id=test_set_id, status=status)
+
+    def update_test(self, test_id, **field_kwargs):
+        """
+        Update the result for the test run.
+        :param test_id: Test ID
+        :param field_kwargs: name, subtype-id, owner, last-modified, description, status, user_xx
+        :return: True: successful, False: Failed
+        """
+        url = "%s/tests/%s" % (self.base_url, test_id)
+        data = self._generate_fileds(**field_kwargs)
+        parameters = dict(fields="id,parent-id,name,user-06,user-09,user-15,user-11,owner,subtype-id")
+        response = self.put(url=url, data=data, params=parameters)
+
+        if response.status_code == 200:
+            print("INFO: Test [%s] is updated to %s " % (test_id, data))
+            return True
+        else:
+            print("ERROR: [%s] Test update failed. [%s]" % (response.status_code, response.text))
             return False
 
     def create_entity(self, entity_type, fields="name,id", retry=0, **field_kwargs):
@@ -296,7 +371,7 @@ class ALM_REST_LIB():
             if isinstance(values, list):
                 for value in values:
                     value_list.append({"value": str(value)})
-            elif type(values) in [str, int, float, unicode]:
+            elif type(values) in [str, int, float]:
                 value_list.append({"value": str(values)})
             else:
                 print("ERROR: Do not support the values: %s type %s " % (values, type(values)))
@@ -336,47 +411,42 @@ def post_result_to_qc(qc_host, domain, project, user, password, test_set_name, t
     else:
         result = "N/A"
 
-    alm = ALM_REST_LIB(host=qc_host, domain=domain, project=project)
-    logined = alm.login(user_name=user, password=password)
-    if logined is False:
-        print("ERROR: Cannot login QC.")
-        return False
-    case_exist = alm.is_case_id_exist(test_id=test_id)
-    if not case_exist:
-        print("ERROR: Cannot found the case id %s in QC. Please check it." % test_id)
-        return False
-
-    test_set_id = alm.get_test_set_id(name=test_set_name, status="Open", only_one=True)
-
-    if not test_set_id:
-        print("INFO: Cannot found test set %s. Create a new one..." % test_set_name)
-        test_set_folder_id = alm.get_test_set_folder_id(name=test_set_folder)
-        if not test_set_folder_id:
-            print("ERROR: Cannot found test set folder %s. Please check whether it is exist in QC. " % test_set_folder)
+    with ALM_REST_LIB(host=qc_host, domain=domain, project=project, user=user, password=password) as alm:
+        case_exist = alm.is_case_id_exist(test_id=test_id)
+        if not case_exist:
+            print("ERROR: Cannot found the case id %s in QC. Please check it." % test_id)
             return False
-        test_set_id = alm.create_test_set(name=test_set_name, parent_id=test_set_folder_id)
+        test_set_id = alm.get_test_set_id(name=test_set_name, status="Open", only_one=True)
         if not test_set_id:
-            print("ERROR: Create test set %s failed" % test_set_name)
-            return False
-    test_instance_id = alm.get_test_instance_id(test_set_id=test_set_id, test_id=test_id)
-    if not test_instance_id:
-        print("INFO: Test instance is not found, create a new one...")
-        test_config_id = alm.get_test_configuration_id(test_id=test_id)
-        test_instance_id = alm.create_test_instance(test_id=test_id, test_set_id=test_set_id,
-                                                    test_config_id=test_config_id, owner=user)
+            print("INFO: Cannot found test set %s. Create a new one..." % test_set_name)
+            test_set_folder_id = alm.get_test_set_folder_id(name=test_set_folder)
+            if not test_set_folder_id:
+                print(
+                        "ERROR: Cannot found test set folder %s. Please check whether it is exist in QC. " % test_set_folder)
+                return False
+            test_set_id = alm.create_test_set(name=test_set_name, parent_id=test_set_folder_id)
+            if not test_set_id:
+                print("ERROR: Create test set %s failed" % test_set_name)
+                return False
+        test_instance_id = alm.get_test_instance_id(test_set_id=test_set_id, test_id=test_id)
         if not test_instance_id:
-            print("ERROR: Create test instance failed.")
+            print("INFO: Test instance is not found, create a new one...")
+            test_config_id = alm.get_test_configuration_id(test_id=test_id)
+            test_instance_id = alm.create_test_instance(test_id=test_id, test_set_id=test_set_id,
+                                                        test_config_id=test_config_id, owner=user)
+            if not test_instance_id:
+                print("ERROR: Create test instance failed.")
+                return False
+        print("INFO: Create test run...")
+        test_run_id = alm.create_test_run(name=run_name, test_set_id=test_set_id, test_id=test_id,
+                                          test_instance_id=test_instance_id,
+                                          owner=user)
+        if test_run_id:
+            updated = alm.update_test_run(test_run_id=test_run_id, result=result, host=test_host, **test_run_kwargs)
+            return updated
+        else:
+            print("ERROR: Post Result failed for %s" % test_id)
             return False
-    print("INFO: Create test run...")
-    test_run_id = alm.create_test_run(name=run_name, test_set_id=test_set_id, test_id=test_id,
-                                      test_instance_id=test_instance_id,
-                                      owner=user)
-    if test_run_id:
-        updated = alm.update_test_run(test_run_id=test_run_id, result=result, host=test_host, **test_run_kwargs)
-        return updated
-    else:
-        print("ERROR: Post Result failed for %s" % test_id)
-        return False
 
 
 def get_qc_id(tags, tag_name='qcid'):
@@ -387,5 +457,17 @@ def get_qc_id(tags, tag_name='qcid'):
 
 
 if __name__ == "__main__":
-    fire.Fire(post_result_to_qc)
+    qc_host = "http://almappprd01.corp.emc.com:8080"
+    domain = "APPAGENT"
+    project = "AppAgent_Miles_R3"
+    user = "wangg27"
+    password = "welcome123"
+    test_id = "11435"
+    run_name = ""
+    result = "Passed"
+    host = "TestHost"
+    ts_folder = "TestFolder"
 
+    post_result_to_qc(qc_host=qc_host, domain=domain, project=project, user=user, password=password, test_set_name="",
+                      test_id=test_id, run_name=run_name, test_host=host, test_set_folder=ts_folder, result=result)
+    # fire.Fire(post_result_to_qc)
