@@ -5,7 +5,7 @@ from commands import getstatusoutput
 from fire import Fire
 
 
-def excute(cmd, ignore_error=True, verbose=False):
+def execute(cmd, ignore_error=True, verbose=False):
     if verbose:
         print("Execute: %s" % cmd)
     status, output = getstatusoutput(cmd)
@@ -29,7 +29,7 @@ def get_nas_acl(path, mount_type="cifs", user=None):
     user_pattern = "%s:" % user if mount_type == "cifs" else "%s@" % user
     get_acl_cmd = "%s %s" % (get_acl_tool, path) if user is None else "%s %s | grep %s" % (
         get_acl_tool, path, user_pattern)
-    output = excute(get_acl_cmd)
+    output = execute(get_acl_cmd)
     return output
 
 
@@ -63,7 +63,7 @@ def set_file_cifs_acl(path, user=None, acl=None, allow_deny=None, flags=None, op
         hex_flags = hex(dec_flags)
         flags = hex_flags
     set_cifs_acl_cmd = "setcifsacl -%s ACL:%s:%s/%s/%s %s" % (operation, user, allow_deny, flags, acl, path)
-    excute(set_cifs_acl_cmd, ignore_error=False)
+    execute(set_cifs_acl_cmd, ignore_error=False)
     acl_string = get_nas_acl(path=path, mount_type="cifs", user=user)
     return acl_string
 
@@ -79,7 +79,7 @@ def set_file_nfs_acl(path, user="fsa", flag=None, acl=None, allow_deny=None, gro
         flag = "-a"
     user_group_flag = "g" if group_or_not is True else ""
     set_nfs_acl_cmd = "nfs4_setfacl %s %s:%s:%s:%s %s" % (flag, allow_deny, user_group_flag, user, acl, path)
-    excute(set_nfs_acl_cmd, ignore_error=False)
+    execute(set_nfs_acl_cmd, ignore_error=False)
     acl_string = get_nas_acl(path=path, mount_type="nfs", user=user)
     return acl_string
 
@@ -125,7 +125,7 @@ def get_mount_type(path):
     mount_point = get_mount_point(path)
     if mount_point:
         mount_cmd = "mount | grep %s" % mount_point
-        mount_info = excute(mount_cmd, ignore_error=False)
+        mount_info = execute(mount_cmd, ignore_error=False)
         mount_pattern = "(.*) on (%s) type (.*) \(.*vers=(\d+\.?\d*)," % mount_point
         matches = re.findall(pattern=mount_pattern, string=mount_info)
         if matches:
@@ -156,7 +156,7 @@ def get_cifs_attr(path, attribute="creationtime"):
         print("ERROR: %s is a %s mount. Not a cifs mount" % (path, mount_type))
         return None
     get_attr_cmd = "getfattr  -n user.cifs.%s %s" % (attribute, path)
-    output = excute(get_attr_cmd, ignore_error=False)
+    output = execute(get_attr_cmd, ignore_error=False)
     return output
 
 
