@@ -10,7 +10,7 @@ def execute(cmd, ignore_error=True, verbose=False):
         print("Execute: %s" % cmd)
     status, output = getstatusoutput(cmd)
     if status != 0:
-        print("ERROR: %s" % output)
+        print("ERROR: Execute command %s in error. msg: %s" % (cmd, output))
         if ignore_error:
             return None
         else:
@@ -26,7 +26,7 @@ def get_nas_acl(path, mount_type=None, user=None):
         mount_type = get_mount_type(path)
     get_acl_tool = "getcifsacl" if mount_type == "cifs" else "nfs4_getfacl"
     user_pattern = "%s:" % user if mount_type == "cifs" else "%s@" % user
-    get_acl_cmd = "%s %s" % (get_acl_tool, path) if user is None else "%s %s | grep %s" % (
+    get_acl_cmd = '%s "%s"' % (get_acl_tool, path) if user is None else '%s "%s" | grep %s' % (
         get_acl_tool, path, user_pattern)
     output = execute(get_acl_cmd)
     return output
@@ -60,7 +60,7 @@ def set_file_cifs_acl(path, user=None, acl=None, allow_deny=None, flags=None, op
         dec_flags = random.randint(0, 31)
         hex_flags = hex(dec_flags)
         flags = hex_flags
-    set_cifs_acl_cmd = "setcifsacl -%s ACL:%s:%s/%s/%s %s" % (operation, user, allow_deny, flags, acl, path)
+    set_cifs_acl_cmd = 'setcifsacl -%s ACL:%s:%s/%s/%s "%s"' % (operation, user, allow_deny, flags, acl, path)
     execute(set_cifs_acl_cmd, ignore_error=False)
     acl_string = get_nas_acl(path=path, mount_type="cifs", user=user)
     return acl_string
@@ -76,7 +76,7 @@ def set_file_nfs_acl(path, user="fsa", flag=None, acl=None, allow_deny=None, gro
     if flag is None:
         flag = "-a"
     user_group_flag = "g" if group_or_not is True else ""
-    set_nfs_acl_cmd = "nfs4_setfacl %s %s:%s:%s:%s %s" % (flag, allow_deny, user_group_flag, user, acl, path)
+    set_nfs_acl_cmd = 'nfs4_setfacl %s %s:%s:%s:%s "%s"' % (flag, allow_deny, user_group_flag, user, acl, path)
     execute(set_nfs_acl_cmd, ignore_error=False)
     acl_string = get_nas_acl(path=path, mount_type="nfs", user=user)
     return acl_string
@@ -104,6 +104,9 @@ def set_nas_folder_acl(folder, user=None):
 
 
 def get_mount_point(path):
+    if not os.path.exists(path):
+        print("ERROR: Path %s is not exist." % path)
+        return None
     while True:
         if path == os.path.dirname(path):
             print("ERROR: It is not a mount path.")
@@ -155,18 +158,20 @@ def get_cifs_attr(path, attribute="creationtime"):
     if mount_type != "cifs":
         print("ERROR: %s is a %s mount. Not a cifs mount" % (path, mount_type))
         return None
-    get_attr_cmd = "getfattr  -n user.cifs.%s %s" % (attribute, path)
+    get_attr_cmd = 'getfattr  -n user.cifs.%s "%s"' % (attribute, path)
     output = execute(get_attr_cmd, ignore_error=False)
     return output
 
 
 def mount_cifs_share(host, share_path, mount_point, version=None, user=None, password=None):
-    option = "vers=%s" % version if version else ""
-    option = "%s,user=%s" % (option, user) if user else option
-    option = "%s,password=%s" % (password, user) if password else option
+    option = "vers=%s," % version if version else ""
+    option = "%suser=%s," % (option, user) if user else option
+    option = "%spassword=%s," % (option, password) if password else option
     option = "-o %s" % option if option else option
-    mount_cmd = "mount -t cifs //%s:%s  %s %s" % (
+    mount_cmd = "mount -t cifs //%s%s  %s %s" % (
         host, share_path, mount_point, option)
+    if not os.path.exists(mount_point):
+        os.makedirs(mount_point)
     execute(mount_cmd, ignore_error=False, verbose=True)
 
 
