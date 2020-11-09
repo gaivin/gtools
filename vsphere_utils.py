@@ -15,7 +15,9 @@
 from pysphere import VIServer, vi_snapshot, vi_virtual_machine
 from pysphere.vi_task import VITask
 import pysphere.resources.VimService_services as VI
-from pysphere.resources.vi_exception import VIException, FaultTypes
+from pysphere.resources.vi_exception import VIException, FaultTypes, VIApiException
+from fire import Fire
+import time
 
 import ssl
 import datetime
@@ -24,7 +26,7 @@ default_context = ssl._create_default_https_context
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-class vSphere(VIServer):
+class Vcenter(VIServer):
 
     def create_vm_snapshot(self, snapshot_name, vm_name, vm_datacenter=None, description=None, force=False,
                            sync_run=True, dump_memory=False):
@@ -71,12 +73,35 @@ class vSphere(VIServer):
                 info_obj.Name, info_obj.Task, info_obj.EventChainId))
         return result
 
-    def power_on_vm(self, vm_name, sync_run=True):
+    def power_on_vm(self, vm_name, sync_run=True, vm_user=None, vm_password=None, check_timeout_seconds=0):
         vm = self.get_vm_by_name(name=vm_name)
         if vm.get_status() == vi_virtual_machine.VMPowerState.POWERED_ON:
             print("VM '%s' already powered on." % vm_name)
             return True
         result = vm.power_on(sync_run=sync_run)
+        if vm_user and vm_password and check_timeout_seconds:
+            check_count = 0
+            rest_seconds = check_timeout_seconds
+            vm_tool_status = vm.get_tools_status()
+            while rest_seconds > 0:
+                if vm_tool_status == vi_virtual_machine.ToolsStatus.NOT_RUNNING:
+                    check_count += 1
+                    sleep_time = check_count * 2
+                    rest_seconds -= sleep_time
+                    print("INFO: Wait %s seconds to check..." % sleep_time)
+                    time.sleep(sleep_time)
+                    vm_tool_status = vm.get_tools_status()
+                elif vm_tool_status == vi_virtual_machine.ToolsStatus.RUNNING:
+                    print("INFO: VM tool is running.")
+                    return vm
+                else:
+                    print("ERROR: VM tool status is %s. Please check the vm tool." % vm_tool_status)
+                    return False
+            if rest_seconds <= 0:
+                print("ERROR: VM is not startup in %s seconds. VM tool status is %s" % (
+                check_timeout_seconds, vm_tool_status))
+                return False
+
         if result is None:
             result = True
             print("INFO: Poweron vm '%s'  successfully." % vm_name)
@@ -185,12 +210,4 @@ class vSphere(VIServer):
 
 
 if __name__ == "__main__":
-    vu = vSphere()
-    vu.connect("10.25.61.45", "administrator", "Chang3M3Now.")
-    vms = ["Ubuntu16.04LTS", "Ubuntu18.04.2LTS"]
-    snapshot_name = "base"
-    description = """Base Snapshot"""
-    for vm in vms:
-        vu.create_vm_snapshot(vm_name=vm, snapshot_name=snapshot_name)
-    # vu.delete_vm_snapshot(vm_name="DS", snapshot_name="test", sync_run=False)
-    # vu.power_off_vm(vm_name="Ubuntu16.04LTS")
+    Fire(Vcenter)
