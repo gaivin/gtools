@@ -117,3 +117,33 @@ def xml2obj(node):
 
     return obj
   
+    
+def transform(obj):
+    """
+    Transform the object to a dict object, which will be used to dump to json file.
+    :param obj:  The object you want to dump
+    :return:
+    """
+    base_class = (str, int, bool, float, unicode, type(None))
+    iterable_class = (list, tuple, set)
+    if isinstance(obj, base_class):  # Return base value
+        return obj
+    elif isinstance(obj, dict):
+        obj_dict = obj
+    elif isinstance(obj, iterable_class):  # Object to list
+        obj_list = []
+        for item in obj:
+            obj_list.append(transform(item))
+        return obj_list
+    else:  # Object to dict
+        obj_dict = obj.__dict__
+    for filed, value in obj_dict.items():
+        if isinstance(value, base_class):
+            pass
+        elif isinstance(value, iterable_class):
+            obj_dict[filed] = []
+            for item in value:
+                obj_dict[filed].append(transform(item))
+        else:
+            obj_dict[filed] = transform(value)
+    return obj_dict
